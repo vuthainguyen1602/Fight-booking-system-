@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Ignore auto-generated code -->
+    <Match>
+        <Class name="~.*\$\$.*"/>
+    </Match>
+
+    <!-- Ignore JPA entities -->
+    <Match>
+        <Class name="~.*\.entity\..*"/>
+    </Match>
+
+    <!-- Ignore DTOs -->
+    <Match>
+        <Class name="~.*\.dto\..*"/>
+    </Match>
+
+    <!-- Ignore Spring's @GeneratedValue ID fields -->
+    <Match>
+        <Field name=".*" annotation="javax.persistence.GeneratedValue"/>
+    </Match>
+
+    <!-- Ignore JPA equals/hashCode issues -->
+    <Match>
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
+        <Class name="~.*\.entity\..*"/>
+    </Match>
+
+    <!-- Ignore JPA field injection -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+        <Class name="~.*\.entity\..*"/>
+    </Match>
+
+    <!-- Ignore Spring's @Autowired fields -->
+    <Match>
+        <Field name=".*" annotation="org.springframework.beans.factory.annotation.Autowired"/>
+    </Match>
+
+    <!-- Ignore Spring's @Value fields -->
+    <Match>
+        <Field name=".*" annotation="org.springframework.beans.factory.annotation.Value"/>
+    </Match>
+
+    <!-- Ignore JUnit test classes -->
+    <Match>
+        <Class name="~.*Test$"/>
+    </Match>
+
+    <Match>
+        <Class name="~.*IT$"/>
+    </Match>
+
+    <!-- Ignore Lombok generated code -->
+    <Match>
+        <Class name="~.*\$\$Lambda\$.*"/>
+    </Match>
+
+    <!-- Ignore Jackson JSON views -->
+    <Match>
+        <Class name="~.*View\$.*"/>
+    </Match>
+</FindBugsFilter>

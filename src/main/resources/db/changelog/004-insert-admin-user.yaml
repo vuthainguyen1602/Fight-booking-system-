@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: 4
+      author: flight-booking-team
+      comment: Insert sample admin user
+      changes:
+        - insert:
+            tableName: users
+            columns:
+              - column:
+                  name: email
+                  value: admin@flightbooking.com
+              - column:
+                  name: auth0_id
+                  value: auth0|sample-admin-id
+              - column:
+                  name: first_name
+                  value: Admin
+              - column:
+                  name: last_name
+                  value: User
+              - column:
+                  name: phone_number
+                  value: +84901234567
+              - column:
+                  name: role
+                  value: ADMIN
+              - column:
+                  name: active
+                  valueBoolean: true
+              - column:
+                  name: created_at
+                  valueDate: now()
+              - column:
+                  name: updated_at
+                  valueDate: now()

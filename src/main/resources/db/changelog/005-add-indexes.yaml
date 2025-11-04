@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - changeSet:
+      id: 5
+      author: flight-booking-team
+      comment: Add indexes for better query performance
+      changes:
+        - createIndex:
+            indexName: idx_flights_status
+            tableName: flights
+            columns:
+              - column:
+                  name: status
+        - createIndex:
+            indexName: idx_bookings_status
+            tableName: bookings
+            columns:
+              - column:
+                  name: status
+        - createIndex:
+            indexName: idx_bookings_created_at
+            tableName: bookings
+            columns:
+              - column:
+                  name: created_at
+                  descending: true

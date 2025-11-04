@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 6
+      author: flight-booking-team
+      comment: Add check constraints
+      changes:
+        - sql:
+            sql: ALTER TABLE flights ADD CONSTRAINT chk_seats CHECK (available_seats <= total_seats AND available_seats >= 0)
+        - sql:
+            sql: ALTER TABLE flights ADD CONSTRAINT chk_price CHECK (price > 0)
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT chk_booking_seats CHECK (number_of_seats > 0 AND number_of_seats <= 9)
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT chk_booking_price CHECK (total_price > 0)

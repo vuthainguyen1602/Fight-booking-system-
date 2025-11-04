@@ -1,0 +1,100 @@
+databaseChangeLog:
+  - changeSet:
+      id: 2
+      author: flight-booking-team
+      changes:
+        - createTable:
+            tableName: flights
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: flight_number
+                  type: VARCHAR(10)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: airline
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: origin
+                  type: VARCHAR(3)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: destination
+                  type: VARCHAR(3)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: departure_time
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: arrival_time
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: total_seats
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: available_seats
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: price
+                  type: DECIMAL(10,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            indexName: idx_flight_number
+            tableName: flights
+            unique: true
+            columns:
+              - column:
+                  name: flight_number
+
+        - createIndex:
+            indexName: idx_departure_time
+            tableName: flights
+            columns:
+              - column:
+                  name: departure_time
+
+        - createIndex:
+            indexName: idx_origin_destination
+            tableName: flights
+            columns:
+              - column:
+                  name: origin
+              - column:
+                  name: destination
