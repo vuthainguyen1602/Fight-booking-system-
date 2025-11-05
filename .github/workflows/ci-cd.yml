@@ -146,7 +146,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     outputs:
-      image_tag: ${{ steps.meta.outputs.tags }}
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+      image_full: ${{ steps.meta.outputs.image_full }}
     steps:
       - uses: actions/checkout@v4
 
@@ -162,24 +163,38 @@ jobs:
       - name: Docker metadata
         id: meta
         run: |
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           IMAGE_TAG="${BRANCH_NAME}-${SHORT_SHA}"
-          echo "tags=$IMAGE_TAG" >> $GITHUB_OUTPUT
-          echo "Building image with tag: $IMAGE_TAG"
+          IMAGE_NAME="${{ github.repository }}"
+          IMAGE_FULL="ghcr.io/${IMAGE_NAME}:${IMAGE_TAG}"
+
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "image_full=$IMAGE_FULL" >> $GITHUB_OUTPUT
+
+          echo "Building image: ${IMAGE_FULL}"
+
 
       - name: Log in to GHCR
         run: echo "${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME || github.actor }}" --password-stdin
 
       - name: Build & push Docker image
         run: |
-          IMAGE_BASE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          IMAGE_TAG=${{ steps.meta.outputs.tags }}
-          
-          # Build with specific tag and latest
-          docker build -t ${IMAGE_BASE}:${IMAGE_TAG} -t ${IMAGE_BASE}:latest .
-          docker push ${IMAGE_BASE}:${IMAGE_TAG}
-          docker push ${IMAGE_BASE}:latest
+          set -e
+          IMAGE_NAME="${{ steps.meta.outputs.image_name }}"
+          IMAGE_TAG="${{ steps.meta.outputs.image_tag }}"
+          IMAGE_FULL="${{ steps.meta.outputs.image_full }}"
+          IMAGE_LATEST="ghcr.io/${IMAGE_NAME}:latest"
+
+          echo "Building Docker image: ${IMAGE_FULL}"
+          docker build -t "${IMAGE_FULL}" -t "${IMAGE_LATEST}" .
+
+          echo "Pushing Docker images to GHCR..."
+          docker push "${IMAGE_FULL}"
+          docker push "${IMAGE_LATEST}"
+
+          echo "✅ Image pushed successfully: ${IMAGE_FULL}"
 
   Deploy:
     needs: BuildAndPushImage
@@ -191,7 +206,7 @@ jobs:
 
       - name: Prepare .env for server
         run: |
-          cat > .env <<'EOF'
+          cat > .env <<EOF
           POSTGRES_DB=${{ secrets.POSTGRES_DB }}
           POSTGRES_USER=${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
@@ -201,6 +216,8 @@ jobs:
           CERTBOT_DOMAIN=${{ secrets.CERTBOT_DOMAIN }}
           SLACK_WEBHOOK_URL=${{ secrets.SLACK_WEBHOOK_URL }}
           IMAGE_TAG=${{ needs.BuildAndPushImage.outputs.image_tag }}
+          IMAGE_NAME=${{ env.IMAGE_NAME }}
+          REGISTRY=${{ env.REGISTRY }}
           EOF
 
       - name: Prepare deployment directory on EC2
