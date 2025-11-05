@@ -14,6 +14,8 @@ services:
       - ./backups:/backups
     networks:
       - backend-network
+    ports:
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-flightbooking}"]
       interval: 10s
@@ -40,6 +42,8 @@ services:
       - redis_data:/data
     networks:
       - backend-network
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -378,4 +382,3 @@ networks:
     driver: bridge
   monitoring-network:
     driver: bridge
-    internal: true
