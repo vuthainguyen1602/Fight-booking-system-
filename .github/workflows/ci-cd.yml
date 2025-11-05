@@ -16,7 +16,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   APP_DOMAIN: thainv.duckdns.org
-  DEPLOY_DIR: /home/flight-booking-system
+  DEPLOY_DIR: /home/ubuntu/flight-booking-system
 
 jobs:
   RunUnitTest:
@@ -202,23 +202,6 @@ jobs:
           SLACK_WEBHOOK_URL=${{ secrets.SLACK_WEBHOOK_URL }}
           IMAGE_TAG=${{ needs.BuildAndPushImage.outputs.image_tag }}
           EOF
-
-      - name: Check repo path
-        run: pwd
-
-      - name: List repo files for SCP
-        run: ls -R .
-
-      - name: Verify files exist
-        run: |
-          echo "=== Workspace contents ==="
-          ls -la
-          echo "=== Docker compose file ==="
-          ls -la docker-compose.yml
-          echo "=== Nginx directory ==="
-          ls -la nginx/
-          echo "=== Prometheus directory ==="
-          ls -la prometheus/
 
       - name: Prepare deployment directory on EC2
         uses: appleboy/ssh-action@v1.0.3
