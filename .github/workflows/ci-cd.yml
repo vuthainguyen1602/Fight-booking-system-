@@ -217,12 +217,12 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           source: |
-            /github/workspace/docker-compose.yml
-            /github/workspace/.env
-            /github/workspace/nginx/*
-            /github/workspace/prometheus/*
+            docker-compose.yml
+            .env
+            nginx/
+            prometheus/
           target: ${{ env.DEPLOY_DIR }}
-          strip_components: 1
+          strip_components: 0
           overwrite: true
           debug: true
 
