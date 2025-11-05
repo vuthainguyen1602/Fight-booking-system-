@@ -16,7 +16,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   APP_DOMAIN: thainv.duckdns.org
-  DEPLOY_DIR: /home/ubuntu/flight-booking-system
+  DEPLOY_DIR: /home/ec2-user/flight-booking-system
 
 jobs:
   RunUnitTest:
