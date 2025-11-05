@@ -221,7 +221,7 @@ jobs:
           ls -la prometheus/
 
       - name: Copy required files to EC2
-        uses: appleboy/scp-action@v0.1.10
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
