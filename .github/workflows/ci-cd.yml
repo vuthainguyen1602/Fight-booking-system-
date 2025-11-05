@@ -16,7 +16,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   APP_DOMAIN: thainv.duckdns.org
-  DEPLOY_DIR: /home/ubuntu/flight-booking-system
+  DEPLOY_DIR: /home/flight-booking-system
 
 jobs:
   RunUnitTest:
@@ -219,6 +219,19 @@ jobs:
           ls -la nginx/
           echo "=== Prometheus directory ==="
           ls -la prometheus/
+
+      - name: Prepare deployment directory on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            mkdir -p ${{ env.DEPLOY_DIR }}
+            chmod 755 ${{ env.DEPLOY_DIR }}
+            # Optional: cleanup old files
+            rm -rf ${{ env.DEPLOY_DIR }}/*
 
       - name: Copy required files to EC2
         uses: appleboy/scp-action@v0.1.7
