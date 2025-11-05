@@ -282,7 +282,7 @@ jobs:
             # This --wait flag uses the healthcheck from docker-compose.yml
             # and replaces the custom 'for' loop
             echo "Deploying and waiting for application to be healthy..."
-            docker compose up -d --no-deps --build app --wait
+            docker compose up -d --build app --wait
             
             echo "Application is healthy!"
             
