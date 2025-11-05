@@ -73,7 +73,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-flightbooking}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      SPRING_REDIS_HOST: flight-booking-redis
+      SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,info,metrics
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: always
