@@ -290,6 +290,8 @@ jobs:
 
       - name: Health check endpoint
         run: |
+          set -e
+          
           echo "Performing health check via ${{ secrets.CERTBOT_DOMAIN }}..."
           sleep 5
           
