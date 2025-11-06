@@ -14,7 +14,7 @@ common:
       rules_directory: /loki/rules
   replication_factor: 1
   ring:
-    instance_addr: 127.0.0.1
+    instance_addr: 0.0.0.0
     kvstore:
       store: inmemory
 
@@ -74,7 +74,7 @@ query_range:
 
 # Frontend worker
 frontend_worker:
-  frontend_address: 127.0.0.1:9095
+  frontend_address: 0.0.0.0:9095
 
 # Ruler for alerting (optional)
 ruler:
