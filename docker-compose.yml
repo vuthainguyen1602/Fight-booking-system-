@@ -163,7 +163,7 @@ services:
       app:
         condition: service_healthy
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/templates/default.conf.template:ro
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
       - certbot_certs:/etc/letsencrypt:ro
       - certbot_www:/var/www/certbot:ro
       - nginx_logs:/var/log/nginx
@@ -331,7 +331,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Node Exporter - System metrics
   node-exporter:
     image: prom/node-exporter:latest
     container_name: flight-booking-node-exporter
@@ -374,7 +373,7 @@ services:
       - '--storage.path=/alertmanager'
       - '--web.external-url=http://localhost:9093'
     ports:
-      - "127.0.0.1:9093:9093"
+      - "127.0.0.1:9094:9093"
     networks:
       - monitoring-network
     depends_on:
@@ -424,7 +423,6 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
-      # Chỉ truy cập qua Nginx reverse proxy
       - "127.0.0.1:3000:3000"
     networks:
       - monitoring-network

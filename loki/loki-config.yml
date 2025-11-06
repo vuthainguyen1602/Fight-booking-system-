@@ -75,7 +75,7 @@ query_range:
 
 # Frontend worker
 frontend_worker:
-  frontend_address: 0.0.0.0:9095
+  frontend_address: "localhost:9095"
 
 # Ruler for alerting (optional)
 ruler:
