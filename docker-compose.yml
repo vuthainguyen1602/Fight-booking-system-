@@ -67,13 +67,12 @@ services:
   redis:
     image: redis:7-alpine
     container_name: flight-booking-redis
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-changeme}
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     networks:
       - backend-network
     ports:
-      # Chỉ bind vào localhost để bảo mật
       - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "--pass", "${REDIS_PASSWORD:-changeme}", "ping"]
