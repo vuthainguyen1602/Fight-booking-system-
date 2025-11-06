@@ -47,9 +47,6 @@ java {
 }
 
 configurations {
-    all {
-        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
-    }
     compileOnly {
         extendsFrom annotationProcessor
     }
@@ -70,6 +67,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'org.springframework.security:spring-security-oauth2-jose'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-logging'
 
     implementation 'org.postgresql:postgresql:42.7.1'
     implementation 'org.liquibase:liquibase-core:4.25.0'
