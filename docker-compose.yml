@@ -173,7 +173,7 @@ services:
     networks:
       - frontend-network
     environment:
-      certbot_domain: ${APP_DOMAIN}
+      certbot_domain: ${CERTBOT_DOMAIN}
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
       interval: 10s
@@ -410,7 +410,7 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASS:?GRAFANA_PASS is required}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_SERVER_ROOT_URL: https://${APP_DOMAIN:-localhost}/grafana
+      GF_SERVER_ROOT_URL: https://${CERTBOT_DOMAIN:-localhost}/grafana
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning

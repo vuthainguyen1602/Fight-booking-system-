@@ -74,8 +74,8 @@ query_range:
   cache_results: true
 
 # Frontend worker
-frontend_worker:
-  frontend_address: "localhost:9095"
+#frontend_worker:
+#  frontend_address: "localhost:9095"
 
 # Ruler for alerting (optional)
 ruler:
