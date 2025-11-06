@@ -6,7 +6,7 @@ spring:
     active: ${SPRING_PROFILE:dev}
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:flight-booking-postgres}:${DB_PORT:5432}/${DB_NAME:flightdb}
+    url: jdbc:postgresql://${DB_HOST:postgresql}:${DB_PORT:5432}/${DB_NAME:flightdb}
     username: ${DB_USERNAME:flightuser}
     password: ${DB_PASSWORD:change_me}
     driver-class-name: org.postgresql.Driver

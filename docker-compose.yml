@@ -3,11 +3,11 @@ version: '3.9'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: flight-booking-postgres
+    container_name: postgresql
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-flightdb}
       POSTGRES_USER: ${POSTGRES_USER:-flightuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -15,7 +15,7 @@ services:
     networks:
       - backend-network
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flightuser} -d ${POSTGRES_DB:-flightdb}"]
       interval: 10s
@@ -33,22 +33,50 @@ services:
           memory: 512M
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # PostgreSQL Backup Service
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local:15-alpine
+    container_name: postgres-backup
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-flightdb}
+      POSTGRES_USER: ${POSTGRES_USER:-flightuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+      HEALTHCHECK_PORT: 8080
+    volumes:
+      - ./backups:/backups
+    networks:
+      - backend-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 
   redis:
     image: redis:7-alpine
     container_name: flight-booking-redis
-    environment:
-      REDIS_HOST: flight-booking-redis
-      REDIS_PORT: 6379
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-changeme}
     volumes:
       - redis_data:/data
     networks:
       - backend-network
     ports:
-      - "6379:6379"
+      # Chỉ bind vào localhost để bảo mật
+      - "127.0.0.1:6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--pass", "${REDIS_PASSWORD:-changeme}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -64,17 +92,23 @@ services:
           memory: 256M
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   app:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-flight-booking-system}:${IMAGE_TAG:-latest}
     container_name: flight-booking-app
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-prod}
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-flightbooking}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-flightdb}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-flightuser}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_REDIS_HOST: flight-booking-redis
       SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,info,metrics
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: always
       JAVA_OPTS: >-
@@ -85,6 +119,7 @@ services:
         -XX:+HeapDumpOnOutOfMemoryError
         -XX:HeapDumpPath=/app/logs
         -Duser.timezone=UTC
+        -Djava.security.egd=file:/dev/./urandom
     volumes:
       - app_logs:/app/logs
     depends_on:
@@ -97,22 +132,29 @@ services:
       - frontend-network
       - monitoring-network
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 5
-      start_period: 3600s
-    restart: on-failure
+      start_period: 480s
+    restart: on-failure:10
     deploy:
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 10
-        window: 120s
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   nginx:
     image: nginx:alpine
@@ -147,6 +189,11 @@ services:
           memory: 128M
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
 
   certbot:
     image: certbot/certbot:latest
@@ -161,6 +208,11 @@ services:
     depends_on:
       - nginx
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Loki - Log aggregation
   loki:
@@ -172,7 +224,7 @@ services:
       - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     networks:
       - monitoring-network
     healthcheck:
@@ -198,7 +250,6 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  # Promtail - Log shipper for Loki
   promtail:
     image: grafana/promtail:2.9.3
     container_name: flight-booking-promtail
@@ -248,12 +299,13 @@ services:
       - '--web.console.templates=/usr/share/prometheus/consoles'
       - '--web.enable-lifecycle'
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     networks:
       - backend-network
       - monitoring-network
     depends_on:
       - app
+      - node-exporter
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
       interval: 10s
@@ -271,6 +323,42 @@ services:
           memory: 512M
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Node Exporter - System metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: flight-booking-node-exporter
+    command:
+      - '--path.rootfs=/host'
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - "127.0.0.1:9100:9100"
+    networks:
+      - monitoring-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   alertmanager:
     image: prom/alertmanager:latest
@@ -284,7 +372,7 @@ services:
       - '--storage.path=/alertmanager'
       - '--web.external-url=http://localhost:9093'
     ports:
-      - "9093:9093"
+      - "127.0.0.1:9093:9093"
     networks:
       - monitoring-network
     depends_on:
@@ -307,6 +395,11 @@ services:
           memory: 128M
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   grafana:
     image: grafana/grafana:latest
@@ -314,21 +407,26 @@ services:
     user: "472"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASS}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASS:?GRAFANA_PASS is required}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_SERVER_ROOT_URL: https://${APP_DOMAIN:-localhost}/grafana
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
       GF_LOG_MODE: console
       GF_LOG_LEVEL: info
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_COOKIE_SAMESITE: "lax"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
-      - "3000:3000"
+      # Chỉ truy cập qua Nginx reverse proxy
+      - "127.0.0.1:3000:3000"
     networks:
       - monitoring-network
+      - frontend-network
     depends_on:
       prometheus:
         condition: service_healthy
@@ -351,6 +449,11 @@ services:
           memory: 256M
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres_data:
@@ -379,7 +482,10 @@ volumes:
 networks:
   backend-network:
     driver: bridge
+    internal: false
   frontend-network:
     driver: bridge
+    internal: false
   monitoring-network:
     driver: bridge
+    internal: false
