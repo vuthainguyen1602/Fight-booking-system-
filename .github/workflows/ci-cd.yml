@@ -292,6 +292,8 @@ jobs:
             
             # Cleanup old images
             docker image prune -f
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Health check endpoint
         run: |
