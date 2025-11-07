@@ -177,7 +177,7 @@ services:
     environment:
       CERTBOT_DOMAIN: ${CERTBOT_DOMAIN}
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider --tries=1 http://localhost/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
