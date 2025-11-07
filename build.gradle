@@ -47,9 +47,6 @@ java {
 }
 
 configurations {
-    all {
-        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
-    }
     compileOnly {
         extendsFrom annotationProcessor
     }
@@ -70,6 +67,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'org.springframework.security:spring-security-oauth2-jose'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-logging'
 
     implementation 'org.postgresql:postgresql:42.7.1'
     implementation 'org.liquibase:liquibase-core:4.25.0'
@@ -163,10 +161,10 @@ jacocoTestCoverageVerification {
 
 sonar {
     properties {
-        property "sonar.projectKey", "flight-booking-system"
+        property "sonar.projectKey", "flight-booking-system-online"
         property "sonar.organization", "vuthainguyen1602"
         property "sonar.host.url", "https://sonarcloud.io"
-        property "sonar.login", "da91d71ea9c0d3ecbecf94612e30bb76ae6365b5"
+        property "sonar.token", System.getenv("SONAR_TOKEN")
         property "sonar.gradle.skipCompile", "true"
         property "sonar.qualitygate.wait", "true"
         property "sonar.java.coveragePlugin", "jacoco"

@@ -2,11 +2,13 @@ server {
     listen 80;
     server_name ${CERTBOT_DOMAIN};
 
+    # Healthcheck HTTP
     location /health {
         return 200 "healthy";
         add_header Content-Type text/plain;
     }
 
+    # Certbot ACME challenge
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
@@ -24,13 +26,37 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/${CERTBOT_DOMAIN}/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
 
+    resolver 127.0.0.11 valid=30s;
+
     location /health {
         return 200 "healthy";
         add_header Content-Type text/plain;
     }
 
     location / {
-        proxy_pass http://flight-booking-app:8080;
+        set $spring_upstream "http://flight-booking-app:8080/";
+        proxy_pass $spring_upstream;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /grafana/ {
+        set $grafana_upstream "http://flight-booking-grafana:3000";
+        proxy_pass $grafana_upstream;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /loki/ {
+        set $loki_upstream "http://flight-booking-loki:3100";
+        proxy_pass $loki_upstream;
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
