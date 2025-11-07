@@ -176,7 +176,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./gradlew sonar --no-daemon
+          ./gradlew sonar --no-daemon -Dsonar.token=$SONAR_TOKEN
         continue-on-error: true
 
   SecurityScan:
