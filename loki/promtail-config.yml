@@ -9,22 +9,32 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: docker
+  - job_name: docker-services
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 10s
+        filters:
+          - name: state
+            values: ["running"]
+
     relabel_configs:
       - source_labels: [__meta_docker_container_log_path]
         target_label: __path__
+
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        target_label: job
 
       - source_labels: [__meta_docker_container_name]
         target_label: container_name
         regex: "/(.*)"
 
-      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+      - source_labels: [job]
         target_label: job
+        regex: '^$'
+        replacement: 'docker'
 
       - source_labels: [__meta_docker_container_id]
         target_label: container_id
+
       - source_labels: [__meta_docker_container_image]
         target_label: container_image
