@@ -168,7 +168,6 @@ sonar {
         property "sonar.gradle.skipCompile", "true"
         property "sonar.qualitygate.wait", "true"
         property "sonar.java.coveragePlugin", "jacoco"
-        property "sonar.branch.name", "main"
         property "sonar.coverage.jacoco.xmlReportPaths", "$buildDir/reports/jacoco/test/jacocoTestReport.xml"
         property "sonar.exclusions", "**/config/**,**/dto/**,**/model/**,**/*Application.java"
     }

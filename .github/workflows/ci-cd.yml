@@ -176,11 +176,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./gradlew sonar \
-            -Dsonar.projectKey=vuthainguyen1602_flight-booking-system-online \
-            -Dsonar.organization=vuthainguyen1602 \
-            -Dsonar.host.url=https://sonarcloud.io \
-            --no-daemon
+          ./gradlew sonar --no-daemon
         continue-on-error: true
 
   SecurityScan:
