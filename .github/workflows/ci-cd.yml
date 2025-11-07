@@ -178,7 +178,7 @@ jobs:
         run: |
           ./gradlew sonar \
             -Dsonar.projectKey=vuthainguyen1602_flight-booking-system-online \
-            -Dsonar.organization=${{ github.repository_owner }} \
+            -Dsonar.organization=vuthainguyen1602 \
             -Dsonar.host.url=https://sonarcloud.io \
             --no-daemon
         continue-on-error: true
