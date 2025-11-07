@@ -34,7 +34,7 @@ server {
     # Grafana
     location /grafana/ {
         # Apply the same fix
-        set $grafana_upstream "http://flight-booking-grafana:3000/";
+        set $grafana_upstream "http://flight-booking-grafana:3000";
         proxy_pass $grafana_upstream;
 
         proxy_set_header Host $host;
