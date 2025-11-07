@@ -161,7 +161,7 @@ jacocoTestCoverageVerification {
 
 sonar {
     properties {
-        property "sonar.projectKey", "vuthainguyen1602_flight-booking-system-online"
+        property "sonar.projectKey", "flight-booking-system-online"
         property "sonar.organization", "vuthainguyen1602"
         property "sonar.host.url", "https://sonarcloud.io"
         property "sonar.token", System.getenv("SONAR_TOKEN")
