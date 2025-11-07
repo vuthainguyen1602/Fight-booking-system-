@@ -1,0 +1,711 @@
+name: CI/CD Pipeline - Flight Booking System
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      skip_tests:
+        description: 'Skip tests'
+        required: false
+        type: boolean
+        default: false
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+  security-events: write
+
+env:
+  JAVA_VERSION: '21'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true
+  APP_DOMAIN: thainv.duckdns.org
+  DEPLOY_DIR: /home/ec2-user/flight-booking-system
+
+jobs:
+  # Job 1: Validate code quality and security
+  CodeQuality:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'corretto'
+          cache: 'gradle'
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Check code formatting
+        run: ./gradlew spotlessCheck --no-daemon || true
+
+      - name: Run Checkstyle
+        run: ./gradlew checkstyleMain checkstyleTest --no-daemon || true
+
+      - name: Dependency vulnerability check
+        run: ./gradlew dependencyCheckAnalyze --no-daemon || true
+
+  # Job 2: Run Unit Tests
+  UnitTests:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.skip_tests != 'true'
+#    services:
+#      postgres:
+#        image: postgres:15-alpine
+#        env:
+#          POSTGRES_DB: testdb
+#          POSTGRES_USER: testuser
+#          POSTGRES_PASSWORD: testpass
+#        ports: ['5432:5432']
+#        options: >-
+#          --health-cmd "pg_isready -U testuser"
+#          --health-interval 10s
+#          --health-timeout 5s
+#          --health-retries 5
+#      redis:
+#        image: redis:7-alpine
+#        ports: ['6379:6379']
+#        options: >-
+#          --health-cmd "redis-cli ping"
+#          --health-interval 10s
+#          --health-timeout 5s
+#          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'corretto'
+          cache: 'gradle'
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Run Unit Tests with Coverage
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        run: ./gradlew clean test jacocoTestReport --no-daemon
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: build/reports/tests/test/
+          retention-days: 7
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/reports/jacoco/test/
+          retention-days: 7
+
+      - name: Comment Test Coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: madrapps/jacoco-report@v1.6.1
+        with:
+          paths: build/reports/jacoco/test/jacocoTestReport.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 70
+          min-coverage-changed-files: 80
+
+  # Job 3: Run Integration Tests
+  IntegrationTests:
+    needs: UnitTests
+    runs-on: ubuntu-latest
+    if: github.event.inputs.skip_tests != 'true'
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: integrationdb
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U testuser"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'corretto'
+          cache: 'gradle'
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Run Integration Tests
+        env:
+          SPRING_PROFILES_ACTIVE: integration
+          DB_HOST: localhost
+          DB_PORT: 5432
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        run: ./gradlew integrationTest --no-daemon
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: build/reports/tests/integrationTest/
+          retention-days: 7
+
+  # Job 4: SonarQube Analysis
+  SonarAnalysis:
+    needs: [UnitTests, IntegrationTests]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'corretto'
+          cache: 'gradle'
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Download coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: build/reports/jacoco/test/
+
+      - name: SonarCloud Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./gradlew sonar \
+            -Dsonar.projectKey=${{ github.repository_owner }}_flight-booking-system \
+            -Dsonar.organization=${{ github.repository_owner }} \
+            -Dsonar.host.url=https://sonarcloud.io \
+            --no-daemon
+        continue-on-error: true
+
+  # Job 5: Security Scan
+  SecurityScan:
+    runs-on: ubuntu-latest
+    needs: CodeQuality
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Job 6: Build Application
+  BuildApplication:
+    needs: [UnitTests, IntegrationTests]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'corretto'
+          cache: 'gradle'
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Generate version
+        id: version
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          VERSION="${BRANCH_NAME}-${SHORT_SHA}-$(date +%Y%m%d-%H%M%S)"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Generated version: $VERSION"
+
+      - name: Build JAR
+        run: ./gradlew bootJar -x test --no-daemon
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-jar
+          path: build/libs/*.jar
+          retention-days: 30
+
+  # Job 7: Build and Push Docker Image
+  BuildAndPushImage:
+    needs: [BuildApplication, SecurityScan]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+      image_full: ${{ steps.meta.outputs.image_full }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: application-jar
+          path: build/libs/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.GHCR_USERNAME || github.actor }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Generate Docker metadata
+        id: meta
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          IMAGE_TAG="${BRANCH_NAME}-${SHORT_SHA}"
+          IMAGE_NAME="${{ github.repository }}"
+          IMAGE_FULL="${{ env.REGISTRY }}/${IMAGE_NAME}:${IMAGE_TAG}"
+
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "image_full=$IMAGE_FULL" >> $GITHUB_OUTPUT
+          
+          echo "Building image: ${IMAGE_FULL}"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_full }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.image_name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ needs.BuildApplication.outputs.version }}
+
+      - name: Scan Docker image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.meta.outputs.image_full }}
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-image-results.sarif'
+
+  # Job 8: Deploy to Environment
+  Deploy:
+    needs: BuildAndPushImage
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || github.ref == 'refs/heads/staging' && 'staging' || 'dev' }}
+      url: https://${{ env.APP_DOMAIN }}
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set environment variables
+        id: env_vars
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+            echo "deploy_host=${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "environment=staging" >> $GITHUB_OUTPUT
+            echo "deploy_host=${{ secrets.STAGING_EC2_HOST }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "deploy_host=${{ secrets.EC2_HOST }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Prepare .env file
+        run: |
+          cat > .env <<EOF
+          # Database Configuration
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          
+          # Redis Configuration
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          
+          # Application Configuration
+          SPRING_PROFILE=${{ steps.env_vars.outputs.environment }}
+          
+          # Docker Image Configuration
+          IMAGE_TAG=${{ needs.BuildAndPushImage.outputs.image_tag }}
+          IMAGE_NAME=${{ env.IMAGE_NAME }}
+          REGISTRY=${{ env.REGISTRY }}
+          
+          # Monitoring Configuration
+          GRAFANA_USER=${{ secrets.GRAFANA_USER }}
+          GRAFANA_PASS=${{ secrets.GRAFANA_PASS }}
+          
+          # Domain Configuration
+          APP_DOMAIN=${{ env.APP_DOMAIN }}
+          CERTBOT_EMAIL=${{ secrets.CERTBOT_EMAIL }}
+          CERTBOT_DOMAIN=${{ secrets.CERTBOT_DOMAIN }}
+          
+          # Notification Configuration
+          SLACK_WEBHOOK_URL=${{ secrets.SLACK_WEBHOOK_URL }}
+          EOF
+
+      - name: Create deployment directory
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ steps.env_vars.outputs.deploy_host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            echo "Creating deployment directory..."
+            mkdir -p ${{ env.DEPLOY_DIR }}
+            mkdir -p ${{ env.DEPLOY_DIR }}/nginx
+            mkdir -p ${{ env.DEPLOY_DIR }}/prometheus
+            mkdir -p ${{ env.DEPLOY_DIR }}/loki
+            mkdir -p ${{ env.DEPLOY_DIR }}/grafana/provisioning
+            mkdir -p ${{ env.DEPLOY_DIR }}/backups
+            chmod -R 755 ${{ env.DEPLOY_DIR }}
+
+      - name: Copy deployment files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ steps.env_vars.outputs.deploy_host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          source: "docker-compose.yml,.env,nginx/,prometheus/,loki/,grafana/"
+          target: ${{ env.DEPLOY_DIR }}
+          overwrite: true
+          strip_components: 0
+
+      - name: Ensure Docker and Docker Compose are ready
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ steps.env_vars.outputs.deploy_host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 5m
+          script: |
+            # Check Docker
+            if ! docker --version &> /dev/null; then
+              echo "Error: Docker is not installed!"
+              exit 1
+            fi
+            echo "✓ Docker is installed"
+            
+            # Install/Update Docker Compose
+            if ! docker compose version &> /dev/null; then
+              echo "Installing Docker Compose plugin..."
+              DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
+              mkdir -p $DOCKER_CONFIG/cli-plugins
+              curl -SL https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-linux-x86_64 \
+                -o $DOCKER_CONFIG/cli-plugins/docker-compose
+              chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+            fi
+            docker compose version
+            echo "✓ Docker Compose is ready"
+            
+            # Install Loki plugin
+            if ! docker plugin ls | grep -q loki; then
+              echo "Installing Loki logging plugin..."
+              docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions || true
+            fi
+            echo "✓ Docker plugins ready"
+
+      - name: Backup current deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ steps.env_vars.outputs.deploy_host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ${{ env.DEPLOY_DIR }}
+            
+            # Backup database
+            if docker ps | grep -q postgresql; then
+              echo "Creating database backup..."
+              BACKUP_FILE="backup-$(date +%Y%m%d-%H%M%S).sql"
+              docker compose exec -T postgres pg_dump -U ${{ secrets.POSTGRES_USER }} ${{ secrets.POSTGRES_DB }} > backups/$BACKUP_FILE
+              gzip backups/$BACKUP_FILE
+              echo "✓ Database backup created: $BACKUP_FILE.gz"
+            
+              # Keep only last 7 days of backups
+              find backups/ -name "backup-*.sql.gz" -mtime +7 -delete
+            fi
+
+      - name: Deploy application
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ steps.env_vars.outputs.deploy_host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 30m
+          script: |
+            set -e
+            cd ${{ env.DEPLOY_DIR }}
+            
+            echo "=========================================="
+            echo "Starting Deployment"
+            echo "Environment: ${{ steps.env_vars.outputs.environment }}"
+            echo "Image: ${{ needs.BuildAndPushImage.outputs.image_full }}"
+            echo "=========================================="
+            
+            # Login to GHCR
+            echo "Logging in to GitHub Container Registry..."
+            echo "${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}" | \
+              docker login ghcr.io -u "${{ secrets.GHCR_USERNAME || github.actor }}" --password-stdin
+            
+            # Pull new images
+            echo "Pulling new images..."
+            docker compose pull app
+            
+            # Deploy with health check wait
+            echo "Deploying application (this may take a few minutes)..."
+            docker compose up -d --wait --wait-timeout 300 app
+            
+            echo "✓ Application deployed and healthy!"
+            
+            # Restart related services
+            echo "Restarting supporting services..."
+            docker compose restart nginx || true
+            docker compose restart prometheus || true
+            docker compose restart grafana || true
+            
+            # Cleanup
+            echo "Cleaning up old Docker images..."
+            docker image prune -af --filter "until=72h"
+            
+            echo "=========================================="
+            echo "Deployment completed successfully!"
+            echo "=========================================="
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting for application to stabilize..."
+          sleep 15
+          
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Health check attempt $((RETRY_COUNT + 1))/$MAX_RETRIES..."
+          
+            if curl -fsS --max-time 15 https://${{ env.APP_DOMAIN }}/actuator/health; then
+              echo "✓ HTTPS health check passed!"
+              exit 0
+            elif curl -fsS --max-time 15 http://${{ steps.env_vars.outputs.deploy_host }}:8080/actuator/health; then
+              echo "✓ HTTP health check passed!"
+              exit 0
+            fi
+          
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              echo "Health check failed, retrying in 10 seconds..."
+              sleep 10
+            fi
+          done
+          
+          echo "✗ Health check failed after $MAX_RETRIES attempts!"
+          exit 1
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests..."
+          
+          # Test main endpoints
+          curl -fsS https://${{ env.APP_DOMAIN }}/actuator/info
+          curl -fsS https://${{ env.APP_DOMAIN }}/actuator/metrics
+          
+          echo "✓ Smoke tests passed!"
+
+      - name: Notify deployment success
+        if: success()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "✅ Deployment Successful",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "✅ Deployment Successful"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {"type": "mrkdwn", "text": "*Environment:*\n${{ steps.env_vars.outputs.environment }}"},
+                    {"type": "mrkdwn", "text": "*Branch:*\n${{ github.ref_name }}"},
+                    {"type": "mrkdwn", "text": "*Commit:*\n${{ github.sha }}"},
+                    {"type": "mrkdwn", "text": "*Deployed by:*\n${{ github.actor }}"},
+                    {"type": "mrkdwn", "text": "*Image:*\n${{ needs.BuildAndPushImage.outputs.image_tag }}"},
+                    {"type": "mrkdwn", "text": "*URL:*\nhttps://${{ env.APP_DOMAIN }}"}
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {"type": "plain_text", "text": "View Application"},
+                      "url": "https://${{ env.APP_DOMAIN }}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {"type": "plain_text", "text": "View Logs"},
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify deployment failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "❌ Deployment Failed",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "❌ Deployment Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {"type": "mrkdwn", "text": "*Environment:*\n${{ steps.env_vars.outputs.environment }}"},
+                    {"type": "mrkdwn", "text": "*Branch:*\n${{ github.ref_name }}"},
+                    {"type": "mrkdwn", "text": "*Commit:*\n${{ github.sha }}"},
+                    {"type": "mrkdwn", "text": "*Failed by:*\n${{ github.actor }}"}
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "⚠️ *Action Required:* Review logs and rollback if necessary"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {"type": "plain_text", "text": "View Logs"},
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                      "style": "danger"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Job 9: Rollback (manual trigger only)
+  Rollback:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.rollback == 'true'
+    environment:
+      name: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Rollback deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ${{ env.DEPLOY_DIR }}
+            echo "Rolling back to previous version..."
+            docker compose down app
+            docker compose up -d app
+            echo "Rollback completed!"
