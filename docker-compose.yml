@@ -261,8 +261,6 @@ services:
       - ./loki/promtail-config.yml:/etc/promtail/config.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - nginx_logs:/var/log/nginx:ro
-      - app_logs:/var/log/app:ro
     command: -config.file=/etc/promtail/config.yml
     networks:
       - monitoring-network
