@@ -160,12 +160,12 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-#      - name: Cache SonarCloud packages
-#        uses: actions/cache@v4
-#        with:
-#          path: ~/.sonar/cache
-#          key: ${{ runner.os }}-sonar
-#          restore-keys: ${{ runner.os }}-sonar
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
 
       - name: Download coverage report
         uses: actions/download-artifact@v4

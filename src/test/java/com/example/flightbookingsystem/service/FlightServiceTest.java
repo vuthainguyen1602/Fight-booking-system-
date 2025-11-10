@@ -66,8 +66,9 @@ class FlightServiceTest {
 
     @Test
     void getFlightById_ShouldThrowException_WhenFlightNotFound() {
+        Long id = 999L;
         assertThrows(ResourceNotFoundException.class, () -> {
-            flightService.getFlightById(anyLong());
+            flightService.getFlightById(id);
         });
     }
 }
