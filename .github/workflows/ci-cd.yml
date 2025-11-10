@@ -143,6 +143,7 @@ jobs:
   SonarAnalysis:
     needs: [ RunUnitTest, RunIntegrationTest ]
     runs-on: ubuntu-latest
+    environment: dev
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
