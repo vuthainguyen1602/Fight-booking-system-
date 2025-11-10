@@ -168,6 +168,7 @@ sonar {
         property "sonar.java.coveragePlugin", "jacoco"
         property "sonar.coverage.jacoco.xmlReportPaths", "$buildDir/reports/jacoco/test/jacocoTestReport.xml"
         property "sonar.exclusions", "**/config/**,**/dto/**,**/model/**,**/*Application.java"
+        property "sonar.java.binaries", "$buildDir/classes/java/main,$buildDir/classes/java/test,$buildDir/classes/java/integrationTest"
     }
 }
 
